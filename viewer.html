@@ -1,1 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Sheet Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+    </style>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+<body>
+    <h1>Google Sheet Viewer</h1>
+    <div id="table-div"></div>
+    <script>
+        google.charts.load('current', { packages: ['table'] });
+        google.charts.setOnLoadCallback(drawTable);
+
+        function drawTable() {
+            // Default query until it is updated
+            const queryString = encodeURIComponent('SELECT A, B, C');
+            const query = new google.visualization.Query(
+                'https://docs.google.com/spreadsheets/d/1-eyv86rnej-FriUKTOJ0KSEgggVwEzI6thaVqzyceO0/gviz/tq?gid=0&headers=1&tq=' + queryString
+            );
+            query.send(handleQueryResponse);
+        }
+
+        function handleQueryResponse(response) {
+            if (response.isError()) {
+                console.error('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+                return;
+            }
+
+            const data = response.getDataTable();
+            const table = new google.visualization.Table(document.getElementById('table-div'));
+            table.draw(data, { showRowNumber: true, width: '100%', height: 'auto' });
+        }
+    </script>
+</body>
+</html>
 
