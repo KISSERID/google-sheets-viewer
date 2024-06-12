@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Sheet Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        #popupForm, #settingsForm {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            border: 1px solid black;
+            background-color: white;
+        }
+        #popupForm input, #popupForm textarea, #settingsForm input {
+            display: block;
+            margin: 10px 0;
+        }
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+<body>
+    <h1>Google Sheet Viewer</h1>
+    <div id="table-div"></div>
+
+    <button onclick="openSettingsForm()">Settings</button>
+    <button onclick="openForm()">Add Data</button>
+
+    <div id="overlay"></div>
+
+    <div id="settingsForm">
+        <h2>Settings</h2>
+        <form id="settingsFormContent">
+            <label for="sheetId">Google Sheet ID:</label><br>
+            <input type="text" id="sheetId" name="sheetId" required><br>
+            <button type="button" onclick="fetchHeaders()">Fetch Columns</button><br>
+            <div id="columnsDiv" style="display: none;">
+                <label for="columns">Select Columns:</label><br>
+                <div id="columnsCheckboxes"></div>
+                <button type="button" onclick="saveSettings()">Save</button>
+            </div>
+            <button type="button" onclick="closeSettingsForm()">Close</button>
+        </form>
+    </div>
+
+    <div id="popupForm">
+        <h2>Add Data</h2>
+        <form id="dataForm">
+            <label for="name">Name:</label><br>
+            <input type="text" id="name" name="name" required><br>
+            <label for="email">Email:</label><br>
+            <input type="email" id="email" name="email" required><br>
+            <label for="message">Message:</label><br>
+            <textarea id="message" name="message" required></textarea><br>
+            <button type="button" onclick="submitData()">Submit</button>
+            <button type="button" onclick="closeForm()">Close</button>
+        </form>
+    </div>
+
+    <script>
+        let sheetId = '1-eyv86rnej-FriUKTOJ0KSEgggVwEzI6thaVqzyceO0'; // Default Sheet ID
+        let columns = 'A, B, C'; // Default Columns
+
+        google.charts.load('current', { packages: ['table'] });
+        google.charts.setOnLoadCallback(drawTable);
+
+        function drawTable() {
+            const queryString = encodeURIComponent(`SELECT ${columns}`);
+            const query = new google.visualization.Query(
+                `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?gid=0&headers=1&tq=${queryString}`
+            );
+            query.send(handleQueryResponse);
+        }
+
+        function handleQueryResponse(response) {
+            if (response.isError()) {
+                console.error('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+                return;
+            }
+
+            const data = response.getDataTable();
+            const table = new google.visualization.Table(document.getElementById('table-div'));
+
+            google.visualization.events.addListener(table, 'select', () => {
+                const selection = table.getSelection();
+                if (selection.length > 0) {
+                    const row = selection[0].row;
+                    const url = data.getValue(row, 2); // Adjust column index for URL if needed
+                    window.open(url, '_blank');
+                }
+            });
+
+            table.draw(data, { showRowNumber: true, width: '100%', height: 'auto' });
+        }
+
+        function openForm() {
+            document.getElementById('popupForm').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function closeForm() {
+            document.getElementById('popupForm').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function openSettingsForm() {
+            document.getElementById('settingsForm').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function closeSettingsForm() {
+            document.getElementById('settingsForm').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function fetchHeaders() {
+            const tempSheetId = document.getElementById('sheetId').value;
+            const query = new google.visualization.Query(
+                `https://docs.google.com/spreadsheets/d/${tempSheetId}/gviz/tq?gid=0&headers=1&tq=${encodeURIComponent('SELECT * LIMIT 1')}`
+            );
+            query.send(response => {
+                if (response.isError()) {
+                    console.error('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+                    return;
+                }
+
+                const data = response.getDataTable();
+                const headers = [];
+                for (let i = 0; i < data.getNumberOfColumns(); i++) {
+                    headers.push(data.getColumnLabel(i));
+                }
+
+                const columnsCheckboxes = document.getElementById('columnsCheckboxes');
+                columnsCheckboxes.innerHTML = ''; // Clear existing checkboxes
+                headers.forEach((header, index) => {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `col${index}`;
+                    checkbox.value = header;
+                    checkbox.checked = true; // Default to checked
+                    const label = document.createElement('label');
+                    label.htmlFor = `col${index}`;
+                    label.appendChild(document.createTextNode(header));
+                    columnsCheckboxes.appendChild(checkbox);
+                    columnsCheckboxes.appendChild(label);
+                    columnsCheckboxes.appendChild(document.createElement('br'));
+                });
+
+                document.getElementById('columnsDiv').style.display = 'block';
+            });
+        }
+
+        function saveSettings() {
+            sheetId = document.getElementById('sheetId').value;
+
+            const selectedColumns = [];
+            const checkboxes = document.getElementById('columnsCheckboxes').getElementsByTagName('input');
+            for (const checkbox of checkboxes) {
+                if (checkbox.checked) {
+                    selectedColumns.push(checkbox.value);
+                }
+            }
+            columns = selectedColumns.join(', ');
+            closeSettingsForm();
+            drawTable(); // Refresh the table with new settings
+        }
+
+        function submitData() {
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                message: document.getElementById('message').value,
+            };
+
+            fetch('YOUR_WEB_APP_URL', {
+                method: 'POST',
+                body: JSON.stringify(formData),
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.result === 'success') {
+                    alert('Data added successfully');
+                    closeForm();
+                    drawTable(); // Refresh the table
+                } else {
+                    alert('Error adding data');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
+
+
